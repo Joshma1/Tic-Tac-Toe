@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Game</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1f2937; /* Dark background */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            width: 90vmin; /* Responsive size */
+            max-width: 400px;
+            aspect-ratio: 1 / 1; /* Maintain square aspect ratio */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            font-weight: bold;
+            color: #f3f4f6;
+            cursor: pointer;
+            background-color: #374151;
+            transition: background-color 0.15s, transform 0.1s;
+        }
+        .cell:hover:not(.occupied) {
+            background-color: #4b5563;
+        }
+        .cell:active:not(.occupied) {
+            transform: scale(0.98);
+        }
+
+        /* Border styling for the grid */
+        .cell:nth-child(-n + 6) { border-bottom: 4px solid #1f2937; }
+        .cell:nth-child(3n + 1), .cell:nth-child(3n + 2) { border-right: 4px solid #1f2937; }
+
+        /* Custom colors for players */
+        .player-x { color: #f87171; /* Red */ }
+        .player-o { color: #60a5fa; /* Blue */ }
+
+        /* Modal for game status */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.7);
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+
+    <h1 class="text-4xl font-extrabold mb-4 text-white">Tic-Tac-Toe</h1>
+    <div id="status" class="text-2xl font-semibold mb-6 text-indigo-300">Player X's Turn</div>
+
+    <!-- Game Board -->
+    <div class="board mb-8">
+        <!-- Cells will be generated and managed by JavaScript -->
+        <div id="cell-0" class="cell" data-index="0"></div>
+        <div id="cell-1" class="cell" data-index="1"></div>
+        <div id="cell-2" class="cell" data-index="2"></div>
+        <div id="cell-3" class="cell" data-index="3"></div>
+        <div id="cell-4" class="cell" data-index="4"></div>
+        <div id="cell-5" class="cell" data-index="5"></div>
+        <div id="cell-6" class="cell" data-index="6"></div>
+        <div id="cell-7" class="cell" data-index="7"></div>
+        <div id="cell-8" class="cell" data-index="8"></div>
+    </div>
+
+    <!-- Controls -->
+    <button id="resetButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-200">
+        Reset Game
+    </button>
+
+    <!-- Modal for showing game status (win/draw) -->
+    <div id="modal" class="modal fixed inset-0 flex items-center justify-center opacity-0 pointer-events-none">
+        <div class="modal-content bg-gray-700 p-8 rounded-xl w-11/12 max-w-sm text-center">
+            <h2 id="modal-message" class="text-3xl font-extrabold text-white mb-4"></h2>
+            <button id="modalResetButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for game state
+        let board = Array(9).fill(null);
+        let currentPlayer = 'X';
+        let gameActive = true;
+        
+        // DOM element references
+        const cells = document.querySelectorAll('.cell');
+        const statusDisplay = document.getElementById('status');
+        const resetButton = document.getElementById('resetButton');
+        const modal = document.getElementById('modal');
+        const modalMessage = document.getElementById('modal-message');
+        const modalResetButton = document.getElementById('modalResetButton');
+
+        // Winning combinations (indices of the board array)
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        /**
+         * Updates the game status display.
+         * @param {string} message - The message to display.
+         * @param {string} colorClass - Tailwind color class for the message.
+         */
+        const updateStatus = (message, colorClass) => {
+            statusDisplay.textContent = message;
+            statusDisplay.className = 'text-2xl font-semibold mb-6 ' + colorClass;
+        };
+
+        /**
+         * Checks if the current game state has a winner or a draw.
+         * @returns {string | null} 'X', 'O' for winner, 'Draw' for a tie, or null otherwise.
+         */
+        const checkResult = () => {
+            for (const condition of winningConditions) {
+                const [a, b, c] = condition;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    // Mark winning cells
+                    document.getElementById(`cell-${a}`).classList.add('bg-green-500');
+                    document.getElementById(`cell-${b}`).classList.add('bg-green-500');
+                    document.getElementById(`cell-${c}`).classList.add('bg-green-500');
+                    return board[a]; // Returns 'X' or 'O'
+                }
+            }
+
+            // Check for Draw (if all cells are filled and no winner)
+            if (board.every(cell => cell !== null)) {
+                return 'Draw';
+            }
+
+            return null; // Game continues
+        };
+
+        /**
+         * Handles a cell click event.
+         * @param {Event} event - The click event object.
+         */
+        const handleCellClick = (event) => {
+            const clickedCell = event.target;
+            const clickedCellIndex = parseInt(clickedCell.dataset.index);
+
+            // Ignore click if game is over or cell is already occupied
+            if (board[clickedCellIndex] !== null || !gameActive) {
+                return;
+            }
+
+            // Update game state and UI
+            board[clickedCellIndex] = currentPlayer;
+            clickedCell.textContent = currentPlayer;
+            clickedCell.classList.add('occupied', `player-${currentPlayer.toLowerCase()}`);
+
+            const result = checkResult();
+
+            if (result) {
+                gameActive = false;
+                if (result === 'Draw') {
+                    modalMessage.textContent = 'Game Draw!';
+                } else {
+                    modalMessage.textContent = `Player ${result} Wins!`;
+                }
+                showModal();
+                updateStatus('Game Over!', 'text-red-400');
+            } else {
+                // Switch player
+                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                const color = currentPlayer === 'X' ? 'text-fuchsia-300' : 'text-sky-300';
+                updateStatus(`Player ${currentPlayer}'s Turn`, color);
+            }
+        };
+
+        /**
+         * Resets the entire game state and UI.
+         */
+        const resetGame = () => {
+            board = Array(9).fill(null);
+            currentPlayer = 'X';
+            gameActive = true;
+
+            cells.forEach(cell => {
+                cell.textContent = '';
+                cell.classList.remove('occupied', 'player-x', 'player-o', 'bg-green-500');
+            });
+
+            // Initial status update
+            updateStatus("Player X's Turn", 'text-indigo-300');
+            hideModal();
+        };
+
+        /**
+         * Shows the game status modal.
+         */
+        const showModal = () => {
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.classList.add('opacity-100');
+        };
+
+        /**
+         * Hides the game status modal.
+         */
+        const hideModal = () => {
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+        };
+
+        // Event Listeners
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        resetButton.addEventListener('click', resetGame);
+        modalResetButton.addEventListener('click', resetGame);
+
+        // Initialize the game when the script loads
+        resetGame();
+    </script>
+</body>
+</html>

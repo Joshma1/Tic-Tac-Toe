@@ -1,2 +1,2 @@
 # Tic-Tac-Toe
-access ant time for fun
+access at any time for fun
